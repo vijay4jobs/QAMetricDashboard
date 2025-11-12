@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8" />
+<title>QA Metrics Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'};</script>
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body x-data="dashboard()" x-init="init()" class="h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<div class="flex h-full">
+  <aside class="w-60 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 space-y-4 hidden md:block">
+    <h1 class="text-xl font-semibold">QA Metrics</h1>
+    <nav class="space-y-2">
+      <button @click="refresh()" class="w-full text-left px-3 py-2 rounded bg-blue-600 text-white text-sm">Refresh</button>
+      <button @click="toggleTheme()" class="w-full text-left px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 text-sm">Toggle Theme</button>
+    </nav>
+  </aside>
+  <main class="flex-1 overflow-y-auto p-4 space-y-6">
+    <header class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div>
+        <h2 class="text-2xl font-bold">Overview</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Key Quality KPIs</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-end">
+        <input type="date" x-model="filters.dateFrom" class="border rounded px-2 py-1 text-sm" />
+        <input type="date" x-model="filters.dateTo" class="border rounded px-2 py-1 text-sm" />
+        <select x-model="filters.projectId" class="border rounded px-2 py-1 text-sm">
+          <option value="">All Projects</option>
+          <template x-for="p in projects" :key="p.id">
+            <option :value="p.id" x-text="p.name"></option>
+          </template>
+        </select>
+        <input placeholder="Tester" x-model="filters.tester" class="border rounded px-2 py-1 text-sm" />
+        <button @click="refresh()" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">Apply</button>
+      </div>
+    </header>
+
+    <section class="grid gap-4 md:grid-cols-3">
+      <div class="p-4 rounded shadow bg-white dark:bg-gray-800" :class="metricDeltaClass(metrics.ddr*100, targets.target_ddr*100)">
+        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">DDR</div>
+        <div class="text-2xl font-mono" x-text="(metrics.ddr*100).toFixed(1)+'%' "></div>
+      </div>
+      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
+        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg Exec Time</div>
+        <div class="text-2xl font-mono" x-text="metrics.avg_execution_time_min.toFixed(1)+' min'"></div>
+      </div>
+      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
+        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Regression Failures</div>
+        <div class="text-2xl font-mono" x-text="metrics.regression_failures"></div>
+      </div>
+      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
+        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Blocked Tests</div>
+        <div class="text-2xl font-mono" x-text="metrics.blocked_tests"></div>
+      </div>
+      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
+        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Coverage</div>
+        <div class="text-2xl font-mono" x-text="metrics.coverage!==null? metrics.coverage.toFixed(1)+'%':'—'"></div>
+      </div>
+      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
+        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Targets</div>
+        <div class="text-sm" x-text="targetsSummary()"></div>
+      </div>
+    </section>
+
+    <section class="grid md:grid-cols-2 gap-6">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow">
+        <h3 class="font-semibold mb-2">DDR Trend (7d)</h3>
+        <canvas id="ddrTrend"></canvas>
+      </div>
+      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow">
+        <h3 class="font-semibold mb-2">Blocked vs Failed vs Passed</h3>
+        <canvas id="statusBreakdown"></canvas>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+function dashboard(){
+  return {
+    metrics: { ddr:0, avg_execution_time_min:0, coverage:null, regression_failures:0, blocked_tests:0, ddr_trend:[] },
+    projects: [],
+    filters: { dateFrom:'', dateTo:'', projectId:'', tester:'' },
+    targets: { target_ddr:0.9 },
+    charts: {},
+    async init(){
+      await this.loadProjects();
+      this.setDefaultDates();
+      await this.refresh();
+    },
+    setDefaultDates(){
+      const end = new Date();
+      const start = new Date(Date.now()-6*86400000);
+      this.filters.dateTo = end.toISOString().slice(0,10);
+      this.filters.dateFrom = start.toISOString().slice(0,10);
+    },
+    async loadProjects(){
+      const r = await fetch('/api/projects');
+      this.projects = await r.json();
+    },
+    async refresh(){
+      const q = new URLSearchParams();
+      Object.entries(this.filters).forEach(([k,v])=> { if(v) q.append(k,v); });
+      const r = await fetch('/api/metrics/overview?'+q.toString());
+      this.metrics = await r.json();
+      this.$nextTick(()=> this.renderCharts());
+    },
+    metricDeltaClass(val, target){
+      if(!target) return '';
+      return val >= target ? 'ring-2 ring-green-500' : 'ring-2 ring-red-500';
+    },
+    targetsSummary(){
+      return `DDR Target ${(this.targets.target_ddr*100).toFixed(0)}%`;
+    },
+    renderCharts(){
+      // DDR Trend
+      const ctx1 = document.getElementById('ddrTrend');
+      const labels = this.metrics.ddr_trend.map(x=>x.day.slice(5));
+      const data = this.metrics.ddr_trend.map(x=>Number((x.ddr*100).toFixed(1)));
+      if (this.charts.ddr) this.charts.ddr.destroy();
+      this.charts.ddr = new Chart(ctx1, { type:'line', data:{ labels, datasets:[{ label:'DDR %', data, borderColor:'#2563EB', fill:false }] }, options:{ scales:{ y:{ beginAtZero:true, max:100 } } } });
+
+      // Status breakdown (fetch statuses quick)
+      fetch('/api/test-runs?pageSize=500').then(r=>r.json()).then(rows=>{
+        const counts = { PASSED:0, FAILED:0, BLOCKED:0 };
+        rows.forEach(r=> counts[r.status] = (counts[r.status]||0)+1);
+        const ctx2 = document.getElementById('statusBreakdown');
+        if (this.charts.status) this.charts.status.destroy();
+        this.charts.status = new Chart(ctx2, { type:'doughnut', data:{ labels:Object.keys(counts), datasets:[{ data:Object.values(counts), backgroundColor:['#22C55E','#EF4444','#F59E0B'] }] } });
+      });
+    },
+    toggleTheme(){
+      document.documentElement.classList.toggle('dark');
+    }
+  }
+}
+</script>
+</body>
+</html>
