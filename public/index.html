@@ -493,8 +493,8 @@
         },
 
         setDefaultDates() {
-          const end = new Date();
-          const start = new Date(end.getFullYear(), end.getMonth(), 1); // First day of current month
+          const end = new Date(); // Today's date
+          const start = new Date(end.getFullYear(), end.getMonth() - 3, 1); // 3 months before, 1st day of that month
           
           // Format dates as YYYY-MM-DD without timezone conversion
           const formatDate = (date) => {
