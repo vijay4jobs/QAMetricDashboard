@@ -26,6 +26,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Run migrations and start
-CMD ["sh", "-c", "npm run migrate && npm start"]
+# Start command - migrations should be run manually or via init script
+# To run migrations: docker exec <container> npm run migrate
+CMD ["npm", "start"]
 
