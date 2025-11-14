@@ -19,6 +19,14 @@ app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Root route - serve login page by default (must be before static middleware)
+// Login page will redirect to dashboard if user is already authenticated
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+// Static file serving (after root route to allow route handler to take precedence)
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Public routes
@@ -83,4 +91,4 @@ app.use('/api/metric-inputs', authMiddleware, metricInputsRouter);
 app.get('/api/health', (req,res)=> res.json({ status: 'ok'}));
 
 const port = process.env.PORT || 3000;
-app.listen(port, ()=> console.log(`Server http://localhost:${port}`));
+app.listen(port, ()=> console.log(`Server http://localhost:${port}/login.html`));

@@ -5,7 +5,23 @@ function rand(arr){return arr[Math.floor(Math.random()*arr.length)];}
 (async () => {
   const db = await getDb();
   console.log('Seeding data');
-  await db.run(`INSERT INTO projects(name) VALUES ('Project Alpha'), ('Project Beta')`);
+  // Insert projects only if they don't exist (handle duplicates gracefully)
+  const projectNames = ['Project Alpha', 'Project Beta'];
+  for (const name of projectNames) {
+    try {
+      const existing = await db.get(`SELECT id FROM projects WHERE name = ?`, [name]);
+      if (!existing) {
+        await db.run(`INSERT INTO projects(name) VALUES (?)`, [name]);
+      }
+    } catch (error) {
+      // If constraint error, project already exists - skip
+      if (error.code === 'SQLITE_CONSTRAINT' || error.code === '23505' || error.errno === 19) {
+        console.log(`Project "${name}" already exists, skipping...`);
+      } else {
+        console.error(`Error inserting project "${name}":`, error);
+      }
+    }
+  }
   const projects = await db.all('SELECT id FROM projects');
   const testers = ['alice','bob','carol'];
   const statuses = ['PASSED','FAILED','BLOCKED'];

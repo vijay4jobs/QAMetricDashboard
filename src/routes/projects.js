@@ -14,15 +14,31 @@ router.get('/', async (req,res) => {
 router.post('/', async (req,res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
+  
+  // Trim and validate name
+  const trimmedName = name.trim();
+  if (!trimmedName) return res.status(400).json({ error: 'Project name cannot be empty' });
+  
   const db = await getDb();
   try {
-    const r = await db.run(`INSERT INTO projects(name) VALUES (?)`, [name]);
-    res.status(201).json({ id: r.lastID || r.id });
-  } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT' || error.code === '23505') {
+    // Check if project already exists before inserting
+    const existing = await db.get(`SELECT id FROM projects WHERE name = ?`, [trimmedName]);
+    if (existing) {
       return res.status(409).json({ error: 'Project with this name already exists' });
     }
-    throw error;
+    
+    const r = await db.run(`INSERT INTO projects(name) VALUES (?)`, [trimmedName]);
+    res.status(201).json({ id: r.lastID || r.id });
+  } catch (error) {
+    // Handle constraint errors (SQLite and PostgreSQL)
+    if (error.code === 'SQLITE_CONSTRAINT' || 
+        error.code === '23505' || 
+        error.errno === 19 ||
+        (error.message && error.message.includes('UNIQUE constraint failed'))) {
+      return res.status(409).json({ error: 'Project with this name already exists' });
+    }
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: 'Failed to create project' });
   }
 });
 
