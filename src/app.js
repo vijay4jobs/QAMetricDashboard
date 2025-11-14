@@ -90,5 +90,17 @@ app.use('/api/metric-inputs', authMiddleware, metricInputsRouter);
 
 app.get('/api/health', (req,res)=> res.json({ status: 'ok'}));
 
+// Error handling middleware (should be last)
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 const port = process.env.PORT || 3000;
-app.listen(port, ()=> console.log(`Server http://localhost:${port}/login.html`));
+app.listen(port, () => {
+  console.log(`Server http://localhost:${port}/login.html`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+}).on('error', (err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
