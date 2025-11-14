@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en" class="h-full">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Metrics Input - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563EB',
+            accent: '#22C55E',
+            danger: '#EF4444',
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    * {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .font-mono {
+      font-family: 'Space Mono', monospace;
+    }
+
+    * {
+      transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 200ms;
+    }
+
+    .glass {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    .dark .glass {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.6), 0 4px 6px -2px rgba(0,0,0,0.4);
+    }
+
+    .gradient-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .gradient-success {
+      background: linear-gradient(135deg, #22C55E 0%, #16a34a 100%);
+    }
+
+    .gradient-danger {
+      background: linear-gradient(135deg, #EF4444 0%, #dc2626 100%);
+    }
+
+    .gradient-info {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563EB 100%);
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      opacity: 0;
+      transform: translateX(400px);
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .dark ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .dark ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+
+<body x-data="inputForm()" x-init="init()"
+  class="h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 antialiased">
+
+  <!-- Toast Notification -->
+  <div x-show="toast.show" x-cloak @click="toast.show = false" class="toast" :class="toast.show ? 'show' : ''">
+    <div class="glass rounded-lg shadow-xl px-6 py-4 min-w-[300px] flex items-center gap-3 cursor-pointer hover:scale-105">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+        :class="toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+
+      <div class="px-1">
+        <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span class="text-base font-bold" x-text="currentUser?.username || 'Guest'"></span>
+        </div>
+      </div>
+      <div class="flex-1">
+        <p class="font-medium text-sm" x-text="toast.message"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    <aside class="w-64 glass border-r border-gray-200/50 dark:border-gray-700/50 p-6 space-y-6 hidden md:block shadow-lg">
+      <div class="flex items-center gap-3 flex-row-reverse md:flex-row">
+        <div class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg order-2 md:order-none md:ml-2">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+            </path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">QA Metrics</h1>
+        </div>
+        <button @click="toggleTheme()"
+          class="w-12 h-12 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-all"
+          aria-label="Toggle theme" title="Toggle theme">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="space-y-2">
+        <a href="/index.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/graphs.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+            </path>
+          </svg>
+          Graphs
+        </a>
+        <a href="/upload.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l-3 3m3-3l3 3M12 3v9"></path>
+          </svg>
+          Upload Metrics
+        </a>
+        <a href="/admin.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span x-text="isAdmin() ? 'Admin' : 'Query Table'"></span>
+        </a>
+        <button @click="handleLogout()"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-red-100 dark:hover:bg-red-900/20 text-sm font-medium flex items-center gap-2 transition-all text-red-600 dark:text-red-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+            </path>
+          </svg>
+          Logout
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+      <!-- Header -->
+      <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+            Metric Input Form</h2>
+          <!-- <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Enter data to calculate QA metrics</p> -->
+        </div>
+
+        <!-- Period Selection & Save Button -->
+        <div class="flex flex-wrap gap-3 items-center">
+          <select x-model="formData.projectId" :disabled="!isAdmin()"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-60">
+            <option value="">Select Project</option>
+            <template x-for="p in projects" :key="p.id">
+              <option :value="p.id" x-text="p.name"></option>
+            </template>
+          </select>
+          <input type="date" x-model="formData.periodStart"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="Period Start" />
+          <input type="date" x-model="formData.periodEnd"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            placeholder="Period End" />
+          <button @click="saveAndCalculate()"
+            class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5 13l4 4L19 7"></path>
+            </svg>
+            Save & Calculate
+          </button>
+        </div>
+      </header>
+
+      <!-- Input Forms -->
+      <div class="grid gap-6 md:grid-cols-3">
+        <!-- Test Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Test Metrics</h3>
+          <div class="grid gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Test Design Productivity</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.test_cases_designed" placeholder="Test Cases Designed"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" step="0.1" x-model="formData.effort_design_review_rework"
+                  placeholder="Effort: Design, Review, Rework (Person Days)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Test Execution Productivity</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.test_cases_executed_productivity"
+                  placeholder="Test Cases Executed"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" step="0.1" x-model="formData.effort_execution"
+                  placeholder="Effort for Execution (Person Days)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Test Design Coverage</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.testable_reqs_mapped_to_tc"
+                  placeholder="Testable Requirements Mapped to TC"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.baselined_testable_reqs"
+                  placeholder="Baselined Testable Requirements"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Test Execution Coverage</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.test_cases_executed" placeholder="Test Cases Executed"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.test_cases_planned" placeholder="Test Cases Planned"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quality & Effort Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Quality & Effort Metrics</h3>
+          <div class="grid gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Test Environment Availability</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.person_days_lost_downtime"
+                  placeholder="Person Days Lost (Downtime)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.planned_effort_person_days"
+                  placeholder="Planned Effort (Person Days)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Defect Rejection</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.defects_rejected" placeholder="Defects Rejected"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.valid_defects_raised" placeholder="Valid Defects Raised"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Effort Variation</label>
+              <div class="space-y-2">
+                <input type="number" step="0.1" x-model="formData.actual_effort_closed"
+                  placeholder="Actual Effort Closed (Hours)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" step="0.1" x-model="formData.estimated_effort_closed"
+                  placeholder="Estimated Effort Closed (Hours)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Effort Per Story Point</label>
+              <div class="space-y-2">
+                <input type="number" step="0.1" x-model="formData.actual_effort_hours"
+                  placeholder="Actual Effort (Hours)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.story_points_accepted_effort"
+                  placeholder="Story Points Accepted"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Delivery & Automation Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Delivery & Automation Metrics</h3>
+          <div class="grid gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Automation Coverage</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.automated_test_cases" placeholder="Automated Test Cases"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.total_test_cases" placeholder="Total Test Cases"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Schedule Variation</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.actual_end_date_days" placeholder="Actual End Date (Days)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.planned_end_date_days" placeholder="Planned End Date (Days)"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Requirements Traceability</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.requirements_mapped_to_tc"
+                  placeholder="Requirements Mapped to Test Cases"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.total_requirements" placeholder="Total Requirements"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">On Time Completion of Milestones or Deliverables</label>
+              <div class="space-y-2">
+                <input type="number" x-model="formData.milestones_completed_ontime"
+                  placeholder="Milestones Completed On Time"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+                <input type="number" x-model="formData.total_milestones" placeholder="Total Milestones"
+                  class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function inputForm() {
+      return {
+        currentUser: {},
+        projects: [],
+        formData: {
+          projectId: '',
+          periodStart: '',
+          periodEnd: '',
+          // Test Design Productivity
+          test_cases_designed: '100',
+          effort_design_review_rework: '10',
+          // Test Execution Productivity
+          test_cases_executed_productivity: '150',
+          effort_execution: '15',
+          // Test Design Coverage
+          testable_reqs_mapped_to_tc: '80',
+          baselined_testable_reqs: '100',
+          // Test Execution Coverage
+          test_cases_executed: '120',
+          test_cases_planned: '150',
+          // Test Environment Availability
+          person_days_lost_downtime: '2',
+          planned_effort_person_days: '20',
+          // Defect Rejection
+          defects_rejected: '5',
+          valid_defects_raised: '50',
+          // Effort Variation
+          actual_effort_closed: '100',
+          estimated_effort_closed: '90',
+          // Effort Per Story Point
+          actual_effort_hours: '8',
+          story_points_accepted_effort: '10',
+          // Automation Coverage
+          automated_test_cases: '60',
+          total_test_cases: '100',
+          // Schedule Variation
+          actual_end_date_days: '15',
+          planned_end_date_days: '14',
+          // Requirements Traceability
+          requirements_mapped_to_tc: '85',
+          total_requirements: '100',
+          // On Time Completion of Milestones or Deliverables
+          milestones_completed_ontime: '8',
+          total_milestones: '10'
+        },
+        toast: { show: false, message: '', type: 'success' },
+
+        async init() {
+          try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) this.currentUser = JSON.parse(userStr);
+          } catch {}
+          await this.loadProjects();
+          this.setDefaultDates();
+          // Default project from login selection for non-admins
+          try {
+            const userStr = localStorage.getItem('user');
+            const selected = localStorage.getItem('selectedProjectId');
+            if (userStr) {
+              const user = JSON.parse(userStr);
+              if (user.role !== 'admin' && selected) {
+                this.formData.projectId = selected;
+              }
+            }
+          } catch {}
+        },
+
+        setDefaultDates() {
+          const end = new Date();
+          const start = new Date(Date.now() - 30 * 86400000);
+          this.formData.periodEnd = end.toISOString().slice(0, 10);
+          this.formData.periodStart = start.toISOString().slice(0, 10);
+        },
+
+        async loadProjects() {
+          try {
+            const r = await fetch('/api/projects');
+            this.projects = await r.json();
+          } catch (e) {
+            this.showToast('Failed to load projects', 'error');
+          }
+        },
+
+        async saveAndCalculate() {
+          if (!this.formData.projectId || !this.formData.periodStart || !this.formData.periodEnd) {
+            this.showToast('Please select project and period dates', 'error');
+            return;
+          }
+
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/metric-inputs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+              body: JSON.stringify(this.formData)
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to save');
+            }
+
+            const result = await response.json();
+            this.showToast('Metrics saved and calculated successfully!', 'success');
+            
+            // Redirect to dashboard after 1.5 seconds
+            setTimeout(() => {
+              window.location.href = '/index.html';
+            }, 1500);
+          } catch (e) {
+            this.showToast('Failed to save: ' + e.message, 'error');
+          }
+        },
+
+        showToast(message, type = 'success') {
+          this.toast.message = message;
+          this.toast.type = type;
+          this.toast.show = true;
+          setTimeout(() => { this.toast.show = false; }, 3000);
+        },
+
+        isAdmin() {
+          try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return false;
+            const user = JSON.parse(userStr);
+            return user.role === 'admin';
+          } catch {
+            return false;
+          }
+        },
+
+        async handleLogout() {
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          }
+          
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login.html';
+        },
+
+        toggleTheme() {
+          document.documentElement.classList.toggle('dark');
+          this.showToast('Theme switched', 'success');
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>
+
+

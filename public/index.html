@@ -1,140 +1,624 @@
 <!doctype html>
 <html lang="en" class="h-full">
+
 <head>
-<meta charset="utf-8" />
-<title>QA Metrics Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={darkMode:'class'};</script>
-<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-</head>
-<body x-data="dashboard()" x-init="init()" class="h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-<div class="flex h-full">
-  <aside class="w-60 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 space-y-4 hidden md:block">
-    <h1 class="text-xl font-semibold">QA Metrics</h1>
-    <nav class="space-y-2">
-      <button @click="refresh()" class="w-full text-left px-3 py-2 rounded bg-blue-600 text-white text-sm">Refresh</button>
-      <button @click="toggleTheme()" class="w-full text-left px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 text-sm">Toggle Theme</button>
-    </nav>
-  </aside>
-  <main class="flex-1 overflow-y-auto p-4 space-y-6">
-    <header class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h2 class="text-2xl font-bold">Overview</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Key Quality KPIs</p>
-      </div>
-      <div class="flex flex-wrap gap-2 items-end">
-        <input type="date" x-model="filters.dateFrom" class="border rounded px-2 py-1 text-sm" />
-        <input type="date" x-model="filters.dateTo" class="border rounded px-2 py-1 text-sm" />
-        <select x-model="filters.projectId" class="border rounded px-2 py-1 text-sm">
-          <option value="">All Projects</option>
-          <template x-for="p in projects" :key="p.id">
-            <option :value="p.id" x-text="p.name"></option>
-          </template>
-        </select>
-        <input placeholder="Tester" x-model="filters.tester" class="border rounded px-2 py-1 text-sm" />
-        <button @click="refresh()" class="px-3 py-1 bg-blue-600 text-white rounded text-sm">Apply</button>
-      </div>
-    </header>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Metrics Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563EB',
+            accent: '#22C55E',
+            danger: '#EF4444',
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
-    <section class="grid gap-4 md:grid-cols-3">
-      <div class="p-4 rounded shadow bg-white dark:bg-gray-800" :class="metricDeltaClass(metrics.ddr*100, targets.target_ddr*100)">
-        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">DDR</div>
-        <div class="text-2xl font-mono" x-text="(metrics.ddr*100).toFixed(1)+'%' "></div>
-      </div>
-      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
-        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg Exec Time</div>
-        <div class="text-2xl font-mono" x-text="metrics.avg_execution_time_min.toFixed(1)+' min'"></div>
-      </div>
-      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
-        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Regression Failures</div>
-        <div class="text-2xl font-mono" x-text="metrics.regression_failures"></div>
-      </div>
-      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
-        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Blocked Tests</div>
-        <div class="text-2xl font-mono" x-text="metrics.blocked_tests"></div>
-      </div>
-      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
-        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Coverage</div>
-        <div class="text-2xl font-mono" x-text="metrics.coverage!==null? metrics.coverage.toFixed(1)+'%':'—'"></div>
-      </div>
-      <div class="p-4 rounded shadow bg-white dark:bg-gray-800">
-        <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Targets</div>
-        <div class="text-sm" x-text="targetsSummary()"></div>
-      </div>
-    </section>
-
-    <section class="grid md:grid-cols-2 gap-6">
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow">
-        <h3 class="font-semibold mb-2">DDR Trend (7d)</h3>
-        <canvas id="ddrTrend"></canvas>
-      </div>
-      <div class="bg-white dark:bg-gray-800 p-4 rounded shadow">
-        <h3 class="font-semibold mb-2">Blocked vs Failed vs Passed</h3>
-        <canvas id="statusBreakdown"></canvas>
-      </div>
-    </section>
-  </main>
-</div>
-<script>
-function dashboard(){
-  return {
-    metrics: { ddr:0, avg_execution_time_min:0, coverage:null, regression_failures:0, blocked_tests:0, ddr_trend:[] },
-    projects: [],
-    filters: { dateFrom:'', dateTo:'', projectId:'', tester:'' },
-    targets: { target_ddr:0.9 },
-    charts: {},
-    async init(){
-      await this.loadProjects();
-      this.setDefaultDates();
-      await this.refresh();
-    },
-    setDefaultDates(){
-      const end = new Date();
-      const start = new Date(Date.now()-6*86400000);
-      this.filters.dateTo = end.toISOString().slice(0,10);
-      this.filters.dateFrom = start.toISOString().slice(0,10);
-    },
-    async loadProjects(){
-      const r = await fetch('/api/projects');
-      this.projects = await r.json();
-    },
-    async refresh(){
-      const q = new URLSearchParams();
-      Object.entries(this.filters).forEach(([k,v])=> { if(v) q.append(k,v); });
-      const r = await fetch('/api/metrics/overview?'+q.toString());
-      this.metrics = await r.json();
-      this.$nextTick(()=> this.renderCharts());
-    },
-    metricDeltaClass(val, target){
-      if(!target) return '';
-      return val >= target ? 'ring-2 ring-green-500' : 'ring-2 ring-red-500';
-    },
-    targetsSummary(){
-      return `DDR Target ${(this.targets.target_ddr*100).toFixed(0)}%`;
-    },
-    renderCharts(){
-      // DDR Trend
-      const ctx1 = document.getElementById('ddrTrend');
-      const labels = this.metrics.ddr_trend.map(x=>x.day.slice(5));
-      const data = this.metrics.ddr_trend.map(x=>Number((x.ddr*100).toFixed(1)));
-      if (this.charts.ddr) this.charts.ddr.destroy();
-      this.charts.ddr = new Chart(ctx1, { type:'line', data:{ labels, datasets:[{ label:'DDR %', data, borderColor:'#2563EB', fill:false }] }, options:{ scales:{ y:{ beginAtZero:true, max:100 } } } });
-
-      // Status breakdown (fetch statuses quick)
-      fetch('/api/test-runs?pageSize=500').then(r=>r.json()).then(rows=>{
-        const counts = { PASSED:0, FAILED:0, BLOCKED:0 };
-        rows.forEach(r=> counts[r.status] = (counts[r.status]||0)+1);
-        const ctx2 = document.getElementById('statusBreakdown');
-        if (this.charts.status) this.charts.status.destroy();
-        this.charts.status = new Chart(ctx2, { type:'doughnut', data:{ labels:Object.keys(counts), datasets:[{ data:Object.values(counts), backgroundColor:['#22C55E','#EF4444','#F59E0B'] }] } });
-      });
-    },
-    toggleTheme(){
-      document.documentElement.classList.toggle('dark');
+    * {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
-  }
-}
-</script>
+
+    .font-mono {
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Smooth transitions */
+    * {
+      transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 200ms;
+    }
+
+    /* Glassmorphism effect */
+    /* Modern card style (solid, soft border, shadow) */
+    .glass {
+      background: #ffffff;
+      border: 1px solid #e5e7eb; /* gray-200 */
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    .dark .glass {
+      background: #111827; /* gray-900 */
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.6), 0 4px 6px -2px rgba(0,0,0,0.4);
+    }
+
+    /* Gradient backgrounds */
+    .gradient-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .gradient-success {
+      background: linear-gradient(135deg, #22C55E 0%, #16a34a 100%);
+    }
+
+    .gradient-danger {
+      background: linear-gradient(135deg, #EF4444 0%, #dc2626 100%);
+    }
+
+    .gradient-warning {
+      background: linear-gradient(135deg, #F59E0B 0%, #d97706 100%);
+    }
+
+    .gradient-info {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563EB 100%);
+    }
+
+    /* KPI Card hover effect */
+    .kpi-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.5s;
+    }
+
+    .kpi-card:hover::before {
+      left: 100%;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      opacity: 0;
+      transform: translateX(400px);
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* Sparkline container */
+    .sparkline-container {
+      height: 40px;
+      margin-top: 8px;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .dark ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .dark ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+
+<body x-data="dashboard()" x-init="init()"
+  class="h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 antialiased">
+
+  <!-- Toast Notification -->
+  <div x-show="toast.show" x-cloak @click="toast.show = false" class="toast" :class="toast.show ? 'show' : ''">
+    <div
+      class="glass rounded-lg shadow-xl px-6 py-4 min-w-[300px] flex items-center gap-3 cursor-pointer hover:scale-105">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+        :class="toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : 'bg-blue-500'">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="font-medium text-sm" x-text="toast.message"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    <aside
+      class="w-64 glass border-r border-gray-200/50 dark:border-gray-700/50 p-6 space-y-6 hidden md:block shadow-lg">
+      <div class="flex items-center gap-3 flex-row-reverse md:flex-row">
+        <div
+          class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg order-2 md:order-none md:ml-2">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+            </path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">QA Metrics</h1>
+        </div>
+        <button @click="toggleTheme()"
+          class="w-12 h-12 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-all"
+          aria-label="Toggle theme" title="Toggle theme">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="px-1">
+        <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span class="text-base font-bold" x-text="currentUser?.username || 'Guest'"></span>
+        </div>
+      </div>
+
+      <nav class="space-y-2">
+        <button @click="refresh()"
+          class="w-full text-left px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+            </path>
+          </svg>
+          Dashboard
+        </button>
+            <a href="/graphs.html"
+              class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                </path>
+              </svg>
+              Graphs
+            </a>
+            <a href="/metrics-input.html"
+              class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                </path>
+              </svg>
+              Enter Metrics
+            </a>
+            <a href="/upload.html"
+              class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l-3 3m3-3l3 3M12 3v9"></path>
+              </svg>
+              Upload Metrics
+            </a>
+            <a href="/admin.html"
+              class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                </path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span x-text="isAdmin() ? 'Admin' : 'Query Table'"></span>
+            </a>
+            <button @click="handleLogout()"
+              class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-red-100 dark:hover:bg-red-900/20 text-sm font-medium flex items-center gap-2 transition-all text-red-600 dark:text-red-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                </path>
+              </svg>
+              Logout
+            </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+      <!-- Header -->
+      <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2
+            class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+            Overview</h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Key Quality KPIs & Trends</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-3 items-center">
+          <div class="relative">
+            <input type="date" x-model="filters.dateFrom"
+              class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+          </div>
+          <div class="relative">
+            <input type="date" x-model="filters.dateTo"
+              class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+          </div>
+          <select x-model="filters.projectId" :disabled="!isAdmin()"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-60">
+            <option value="">All Projects</option>
+            <template x-for="p in projects" :key="p.id">
+              <option :value="p.id" x-text="p.name"></option>
+            </template>
+          </select>
+              <button @click="refresh()"
+                class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all">
+                Apply Filters
+              </button>
+              <a href="/metrics-input.html"
+                class="px-6 py-2 glass border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
+                Enter Metrics
+              </a>
+        </div>
+      </header>
+
+      <!-- KPI Cards by Section -->
+      <div class="space-y-6">
+        <!-- Test Productivity Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Test Productivity Metrics</h3>
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <template x-for="metric in metricSections.testProductivity" :key="metric.name">
+              <div class="kpi-card glass rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="text-base uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 flex-1 pr-2" x-text="metric.name"></div>
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center shadow-md flex-shrink-0"
+                    :class="metric.direction === 'HTB' ? 'gradient-success' : 'gradient-danger'">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                      </path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="text-lg font-mono font-bold mb-2">
+                  <span x-text="metric.value !== null && metric.value !== undefined ? (metric.value + (metric.unit === '%' ? '%' : ' ' + metric.unit)) : '—'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-gray-500 dark:text-gray-400" x-text="metric.unit"></div>
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+                    :class="metric.direction === 'HTB'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'">
+                    <span x-text="metric.direction === 'HTB' ? 'HTB' : 'LTB'"></span>
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <!-- Test Coverage Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Test Coverage Metrics</h3>
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <template x-for="metric in metricSections.testCoverage" :key="metric.name">
+              <div class="kpi-card glass rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="text-base uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 flex-1 pr-2" x-text="metric.name"></div>
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center shadow-md flex-shrink-0"
+                    :class="metric.direction === 'HTB' ? 'gradient-success' : 'gradient-danger'">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                      </path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="text-lg font-mono font-bold mb-2">
+                  <span x-text="metric.value !== null && metric.value !== undefined ? (metric.value + (metric.unit === '%' ? '%' : ' ' + metric.unit)) : '—'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-gray-500 dark:text-gray-400" x-text="metric.unit"></div>
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+                    :class="metric.direction === 'HTB'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'">
+                    <span x-text="metric.direction === 'HTB' ? 'HTB' : 'LTB'"></span>
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <!-- Quality & Effort Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Quality & Effort Metrics</h3>
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <template x-for="metric in metricSections.qualityEffort" :key="metric.name">
+              <div class="kpi-card glass rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="text-base uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 flex-1 pr-2" x-text="metric.name"></div>
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center shadow-md flex-shrink-0"
+                    :class="metric.direction === 'HTB' ? 'gradient-success' : 'gradient-danger'">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                      </path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="text-lg font-mono font-bold mb-2">
+                  <span x-text="metric.value !== null && metric.value !== undefined ? (metric.value + (metric.unit === '%' ? '%' : ' ' + metric.unit)) : '—'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-gray-500 dark:text-gray-400" x-text="metric.unit"></div>
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+                    :class="metric.direction === 'HTB'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'">
+                    <span x-text="metric.direction === 'HTB' ? 'HTB' : 'LTB'"></span>
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <!-- Delivery & Automation Metrics -->
+        <section class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Delivery & Automation Metrics</h3>
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <template x-for="metric in metricSections.deliveryAutomation" :key="metric.name">
+              <div class="kpi-card glass rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="text-base uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 flex-1 pr-2" x-text="metric.name"></div>
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center shadow-md flex-shrink-0"
+                    :class="metric.direction === 'HTB' ? 'gradient-success' : 'gradient-danger'">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                      </path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="text-lg font-mono font-bold mb-2">
+                  <span x-text="metric.value !== null && metric.value !== undefined ? (metric.value + (metric.unit === '%' ? '%' : ' ' + metric.unit)) : '—'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-gray-500 dark:text-gray-400" x-text="metric.unit"></div>
+                  <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+                    :class="metric.direction === 'HTB'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'">
+                    <span x-text="metric.direction === 'HTB' ? 'HTB' : 'LTB'"></span>
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function dashboard() {
+      return {
+        currentUser: {},
+        projects: [],
+        filters: { dateFrom: '', dateTo: '', projectId: '' },
+        metricSections: {
+          testProductivity: [
+            { name: 'Test Design Productivity', key: 'test_design_productivity', unit: 'TC/PD', direction: 'HTB', value: null },
+            { name: 'Test Execution Productivity', key: 'test_execution_productivity', unit: 'TC/PD', direction: 'HTB', value: null },
+            { name: 'Test Environment Availability', key: 'test_environment_availability', unit: '%', direction: 'HTB', value: null }
+          ],
+          testCoverage: [
+            { name: 'Test Design Coverage', key: 'test_design_coverage', unit: '%', direction: 'HTB', value: null },
+            { name: 'Test Execution Coverage', key: 'test_execution_coverage', unit: '%', direction: 'HTB', value: null },
+            { name: 'Requirements Traceability', key: 'requirements_traceability', unit: '%', direction: 'HTB', value: null }
+          ],
+          qualityEffort: [
+            { name: 'Defect Rejection', key: 'defect_rejection', unit: '%', direction: 'LTB', value: null },
+            { name: 'Effort Variation', key: 'effort_variation', unit: '%', direction: 'LTB', value: null },
+            { name: 'Effort Per Story Point', key: 'effort_per_story_point', unit: 'PHrs / Story Point', direction: 'LTB', value: null }
+          ],
+          deliveryAutomation: [
+            { name: 'Automation Coverage', key: 'automation_coverage', unit: '%', direction: 'HTB', value: null },
+            { name: 'Schedule Variation', key: 'schedule_variation', unit: '%', direction: 'LTB', value: null },
+            { name: 'On Time Completion of Milestones or Deliverables', key: 'on_time_completion_milestones', unit: '%', direction: 'HTB', value: null }
+          ]
+        },
+        toast: { show: false, message: '', type: 'success' },
+
+        async init() {
+          await this.loadProjects();
+          this.setDefaultDates();
+          // Default project from login selection for non-admins
+          try {
+            const userStr = localStorage.getItem('user');
+            const selected = localStorage.getItem('selectedProjectId');
+            if (userStr) {
+              const user = JSON.parse(userStr);
+              this.currentUser = user;
+              if (user.role !== 'admin' && selected) {
+                this.filters.projectId = selected;
+              }
+            }
+          } catch {}
+          await this.loadCalculatedMetrics();
+        },
+
+        setDefaultDates() {
+          const end = new Date();
+          const start = new Date(end.getFullYear(), end.getMonth(), 1); // First day of current month
+          
+          // Format dates as YYYY-MM-DD without timezone conversion
+          const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          this.filters.dateTo = formatDate(end);
+          this.filters.dateFrom = formatDate(start);
+        },
+
+        async loadProjects() {
+          try {
+            const r = await fetch('/api/projects');
+            const allProjects = await r.json();
+            // Remove duplicates by project name, keeping the first occurrence
+            const seen = new Set();
+            this.projects = allProjects.filter(p => {
+              if (seen.has(p.name)) {
+                return false;
+              }
+              seen.add(p.name);
+              return true;
+            });
+          } catch (e) {
+            this.showToast('Failed to load projects', 'error');
+          }
+        },
+
+        async loadCalculatedMetrics() {
+          try {
+            const q = new URLSearchParams();
+            if (this.filters.projectId) q.append('projectId', this.filters.projectId);
+            if (this.filters.dateFrom) q.append('periodStart', this.filters.dateFrom);
+            if (this.filters.dateTo) q.append('periodEnd', this.filters.dateTo);
+            
+            const token = localStorage.getItem('authToken');
+            const r = await fetch('/api/metric-inputs/calculated?' + q.toString(), {
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            const calculated = await r.json();
+            
+            // Update all metrics in all sections with calculated values
+            Object.values(this.metricSections).forEach(section => {
+              if (Array.isArray(section)) {
+                section.forEach(metric => {
+                  if (calculated[metric.key] && calculated[metric.key].metric_value != null) {
+                    metric.value = Number(calculated[metric.key].metric_value.toFixed(2));
+                  } else {
+                    metric.value = null;
+                  }
+                });
+              }
+            });
+          } catch (e) {
+            console.error('Failed to load calculated metrics:', e);
+          }
+        },
+
+        async refresh() {
+          try {
+            await this.loadCalculatedMetrics();
+            // this.showToast('Data refreshed successfully', 'success');
+            const centerBanner = document.createElement('div');
+            centerBanner.innerText = 'Data refreshed successfully';
+            centerBanner.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-3 py-2 bg-green-600 text-white rounded-md shadow text-center font-medium transition-all duration-300 text-sm';
+            document.body.appendChild(centerBanner);
+            setTimeout(() => {
+              centerBanner.classList.add('opacity-0');
+              setTimeout(() => centerBanner.remove(), 300);
+            }, 800);
+          } catch (e) {
+            this.showToast('Failed to refresh data', 'error');
+          }
+        },
+
+        showToast(message, type = 'success') {
+          this.toast.message = message;
+          this.toast.type = type;
+          this.toast.show = true;
+          setTimeout(() => { this.toast.show = false; }, 3000);
+        },
+
+        isAdmin() {
+          try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return false;
+            const user = JSON.parse(userStr);
+            return user.role === 'admin';
+          } catch {
+            return false;
+          }
+        },
+
+        async handleLogout() {
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          }
+          
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login.html';
+        },
+
+        toggleTheme() {
+          document.documentElement.classList.toggle('dark');
+          this.showToast('Theme switched', 'success');
+        }
+      }
+    }
+  </script>
 </body>
+
 </html>

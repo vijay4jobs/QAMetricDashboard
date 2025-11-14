@@ -15,8 +15,15 @@ router.post('/', async (req,res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   const db = await getDb();
-  const r = await db.run(`INSERT INTO projects(name) VALUES (?)`, [name]);
-  res.status(201).json({ id: r.lastID || r.id });
+  try {
+    const r = await db.run(`INSERT INTO projects(name) VALUES (?)`, [name]);
+    res.status(201).json({ id: r.lastID || r.id });
+  } catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT' || error.code === '23505') {
+      return res.status(409).json({ error: 'Project with this name already exists' });
+    }
+    throw error;
+  }
 });
 
 export default router;

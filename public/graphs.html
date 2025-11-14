@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en" class="h-full">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Metrics - Graphs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563EB',
+            accent: '#22C55E',
+            danger: '#EF4444',
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    * {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .font-mono {
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Glassmorphism effect */
+    .glass {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    .dark .glass {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.6), 0 4px 6px -2px rgba(0,0,0,0.4);
+    }
+
+    /* Gradient backgrounds */
+    .gradient-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .gradient-success {
+      background: linear-gradient(135deg, #22C55E 0%, #16a34a 100%);
+    }
+
+    .gradient-danger {
+      background: linear-gradient(135deg, #EF4444 0%, #dc2626 100%);
+    }
+
+    [x-cloak] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body x-data="graphs()" x-init="init()"
+  class="h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 antialiased">
+
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    <aside class="w-64 glass border-r border-gray-200/50 dark:border-gray-700/50 p-6 space-y-6 hidden md:block shadow-lg">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+            </path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">
+            QA Metrics</h1>
+        </div>
+        <button @click="toggleTheme()"
+          class="w-10 h-10 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-all ml-auto"
+          aria-label="Toggle theme" title="Toggle theme">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="px-1">
+        <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span class="text-base font-bold" x-text="currentUser?.username || 'Guest'"></span>
+        </div>
+      </div>
+
+      <nav class="space-y-2">
+        <a href="/index.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+            </path>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/graphs.html"
+          class="w-full text-left px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+            </path>
+          </svg>
+          Graphs
+        </a>
+        <a href="/metrics-input.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+            </path>
+          </svg>
+          Enter Metrics
+        </a>
+        <a href="/upload.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l-3 3m3-3l3 3M12 3v9"></path>
+          </svg>
+          Upload Metrics
+        </a>
+        <a href="/admin.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span x-text="isAdmin() ? 'Admin' : 'Query Table'"></span>
+        </a>
+        <button @click="handleLogout()"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-red-100 dark:hover:bg-red-900/20 text-sm font-medium flex items-center gap-2 transition-all text-red-600 dark:text-red-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+            </path>
+          </svg>
+          Logout
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+      <!-- Header -->
+      <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2
+            class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+            Metrics Graphs</h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Visualize metric trends over time</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-3 items-center">
+          <input type="date" x-model="filters.dateFrom"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+          <input type="date" x-model="filters.dateTo"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+          <select x-model="filters.metricKey"
+            class="glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            <option value="">All Metrics</option>
+            <template x-for="metric in availableMetrics" :key="metric.key">
+              <option :value="metric.key" x-text="metric.name"></option>
+            </template>
+          </select>
+          <button @click="loadGraphs()"
+            class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all">
+            Load Graphs
+          </button>
+        </div>
+      </header>
+
+      <!-- Loading State -->
+      <div x-show="loading" x-cloak class="text-center py-12 glass rounded-2xl p-8">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p class="text-gray-500 dark:text-gray-400">Loading graph data...</p>
+      </div>
+
+      <!-- No Data State -->
+      <div x-show="!loading && charts.length === 0" x-cloak class="text-center py-12 glass rounded-2xl p-8">
+        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+          </path>
+        </svg>
+        <p class="text-gray-500 dark:text-gray-400 text-lg mb-2">No graph data available</p>
+        <p class="text-gray-400 dark:text-gray-500 text-sm">Select date range and click "Load Graphs"</p>
+      </div>
+
+      <!-- Charts -->
+      <div x-show="!loading && charts.length > 0" x-cloak class="grid gap-6 md:grid-cols-2">
+        <template x-for="(chartData, index) in charts" :key="index">
+          <div class="glass rounded-2xl p-6 shadow-lg">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-xl font-semibold" x-text="chartData.title"></h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400" x-text="`${chartData.dataPoints.length} data points`"></p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-xs font-semibold"
+                :class="chartData.direction === 'HTB' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'"
+                x-text="chartData.direction === 'HTB' ? 'Higher The Better' : 'Lower The Better'"></span>
+            </div>
+            <div style="position: relative; height: 400px;">
+              <canvas :id="'chart-' + index"></canvas>
+            </div>
+          </div>
+        </template>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function graphs() {
+      return {
+        currentUser: {},
+        filters: { dateFrom: '', dateTo: '', metricKey: '' },
+        availableMetrics: [
+          { key: 'test_design_productivity', name: 'Test Design Productivity' },
+          { key: 'test_execution_productivity', name: 'Test Execution Productivity' },
+          { key: 'test_design_coverage', name: 'Test Design Coverage' },
+          { key: 'test_execution_coverage', name: 'Test Execution Coverage' },
+          { key: 'defect_rejection', name: 'Defect Rejection' },
+          { key: 'effort_variation', name: 'Effort Variation' },
+          { key: 'automation_coverage', name: 'Automation Coverage' }
+        ],
+        charts: [],
+        chartInstances: [],
+        loading: false,
+
+        async init() {
+          try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) this.currentUser = JSON.parse(userStr);
+          } catch {}
+          this.setDefaultDates();
+          await this.loadGraphs();
+        },
+
+        setDefaultDates() {
+          const end = new Date();
+          const start = new Date(end.getFullYear(), end.getMonth() - 2, 1);
+          
+          const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          this.filters.dateTo = formatDate(end);
+          this.filters.dateFrom = formatDate(start);
+        },
+
+        async loadGraphs() {
+          if (!this.filters.dateFrom || !this.filters.dateTo) {
+            alert('Please select date range');
+            return;
+          }
+
+          this.loading = true;
+          this.charts = [];
+          
+          // Destroy existing chart instances
+          this.chartInstances.forEach(chart => {
+            if (chart) chart.destroy();
+          });
+          this.chartInstances = [];
+
+          try {
+            const metricsToLoad = this.filters.metricKey 
+              ? [this.availableMetrics.find(m => m.key === this.filters.metricKey)]
+              : this.availableMetrics;
+            // Deduplicate by metric key (prevents duplicate cards)
+            const uniqueMetrics = Array.from(new Map(metricsToLoad.filter(Boolean).map(m => [m.key, m])).values());
+
+            for (const metric of uniqueMetrics) {
+              const params = new URLSearchParams({
+                periodStart: this.filters.dateFrom,
+                periodEnd: this.filters.dateTo,
+                metricKey: metric.key
+              });
+
+              // Apply project scope from login for non-admin users
+              try {
+                const userStr = localStorage.getItem('user');
+                const selected = localStorage.getItem('selectedProjectId');
+                if (userStr) {
+                  const user = JSON.parse(userStr);
+                  if (user.role !== 'admin' && selected) {
+                    params.append('projectId', selected);
+                  }
+                }
+              } catch {}
+              
+              const token = localStorage.getItem('authToken');
+              const response = await fetch('/api/metric-inputs/time-series?' + params.toString(), {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+              });
+              if (!response.ok) continue;
+              
+              const data = await response.json();
+              
+              if (data && data.length > 0) {
+                // Avoid pushing duplicate chart entries for the same metric
+                if (this.charts.some(c => c.metricKey === metric.key)) continue;
+                this.charts.push({
+                  title: metric.name,
+                  metricKey: metric.key,
+                  dataPoints: data,
+                  direction: data[0].direction || 'HTB',
+                  unit: data[0].unit || ''
+                });
+              }
+            }
+
+            // Wait for DOM to update
+            await this.$nextTick();
+            setTimeout(() => this.renderCharts(), 100);
+          } catch (error) {
+            console.error('Error loading graphs:', error);
+            alert('Failed to load graph data');
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        renderCharts() {
+          this.charts.forEach((chartData, index) => {
+            const canvas = document.getElementById('chart-' + index);
+            if (!canvas) {
+              console.error('Canvas not found:', 'chart-' + index);
+              return;
+            }
+
+            // Group data by project and period
+            const projectMap = {};
+            chartData.dataPoints.forEach(item => {
+              if (!projectMap[item.project_name]) {
+                projectMap[item.project_name] = {};
+              }
+              projectMap[item.project_name][item.period_start] = Number(item.metric_value);
+            });
+
+            // Get all unique periods
+            const periods = [...new Set(chartData.dataPoints.map(d => d.period_start))].sort();
+            
+            // Format labels
+            const labels = periods.map(period => {
+              const date = new Date(period);
+              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            });
+
+            // Create datasets for each project
+            const colors = [
+              'rgb(37, 99, 235)',   // blue
+              'rgb(34, 197, 94)',   // green
+              'rgb(239, 68, 68)',   // red
+              'rgb(168, 85, 247)',  // purple
+              'rgb(251, 146, 60)',  // orange
+            ];
+
+            const datasets = Object.keys(projectMap).map((projectName, idx) => {
+              const data = periods.map(period => projectMap[projectName][period] || null);
+              const color = colors[idx % colors.length];
+              
+              return {
+                label: projectName,
+                data: data,
+                backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.6)'),
+                borderColor: color,
+                borderWidth: 2,
+                borderRadius: 4
+              };
+            });
+
+            const isDark = document.documentElement.classList.contains('dark');
+            
+            const chart = new Chart(canvas, {
+              type: 'bar',
+              data: { labels, datasets },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'top',
+                    labels: {
+                      color: isDark ? '#e5e7eb' : '#374151',
+                      usePointStyle: true,
+                      padding: 15
+                    }
+                  },
+                  tooltip: {
+                    backgroundColor: isDark ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                    titleColor: isDark ? '#e5e7eb' : '#374151',
+                    bodyColor: isDark ? '#e5e7eb' : '#374151',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                    borderWidth: 1
+                  },
+                  datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 4,
+                    color: isDark ? '#e5e7eb' : '#374151',
+                    font: {
+                      weight: 'bold',
+                      size: 11
+                    },
+                    formatter: function(value) {
+                      if (value === null || value === undefined) return '';
+                      return value.toFixed(2);
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    title: {
+                      display: true,
+                      text: 'Period',
+                      color: isDark ? '#9ca3af' : '#6b7280',
+                      font: {
+                        size: 14,
+                        weight: 'bold'
+                      }
+                    },
+                    ticks: {
+                      color: isDark ? '#9ca3af' : '#6b7280',
+                      maxRotation: 0,
+                      minRotation: 0
+                    },
+                    grid: {
+                      color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                      display: false
+                    }
+                  },
+                  y: {
+                    title: {
+                      display: true,
+                      text: chartData.title + ' (' + chartData.unit + ')',
+                      color: isDark ? '#9ca3af' : '#6b7280',
+                      font: {
+                        size: 14,
+                        weight: 'bold'
+                      }
+                    },
+                    beginAtZero: true,
+                    ticks: {
+                      color: isDark ? '#9ca3af' : '#6b7280',
+                      callback: function(value) {
+                        return value.toFixed(2) + (chartData.unit === '%' ? '%' : ' ' + chartData.unit);
+                      }
+                    },
+                    grid: {
+                      color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                    }
+                  }
+                }
+              }
+            });
+
+            this.chartInstances.push(chart);
+          });
+        },
+
+        isAdmin() {
+          try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return false;
+            const user = JSON.parse(userStr);
+            return user.role === 'admin';
+          } catch {
+            return false;
+          }
+        },
+
+        async handleLogout() {
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          }
+          
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login.html';
+        },
+
+        toggleTheme() {
+          document.documentElement.classList.toggle('dark');
+          // Reload charts with new theme
+          setTimeout(() => {
+            this.chartInstances.forEach(chart => chart.destroy());
+            this.chartInstances = [];
+            this.renderCharts();
+          }, 100);
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>
+
+

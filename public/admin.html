@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="en" class="h-full">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Metrics - Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563EB',
+            accent: '#22C55E',
+            danger: '#EF4444',
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script type="module">
+    // Require authentication; role-based UI handled in-page (cookie-based auth)
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      window.location.href = '/login.html';
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    * {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .font-mono {
+      font-family: 'Space Mono', monospace;
+    }
+
+    .glass {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    .dark .glass {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.6), 0 4px 6px -2px rgba(0,0,0,0.4);
+    }
+
+    .gradient-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    [x-cloak] {
+      display: none !important;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      opacity: 0;
+      transform: translateX(400px);
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  </style>
+</head>
+
+<body x-data="admin()" x-init="init()"
+  class="h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 antialiased">
+
+  <!-- Toast Notification -->
+  <div x-show="toast.show" x-cloak @click="toast.show = false" class="toast" :class="toast.show ? 'show' : ''">
+    <div class="glass rounded-lg shadow-xl px-6 py-4 min-w-[300px] flex items-center gap-3 cursor-pointer hover:scale-105">
+      <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+        :class="toast.type === 'success' ? 'bg-green-500' : toast.type === 'error' ? 'bg-red-500' : toast.type === 'info' ? 'bg-yellow-500' : 'bg-blue-500'">
+        <svg x-show="toast.type === 'success'" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <svg x-show="toast.type === 'error'" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+        <svg x-show="toast.type === 'info'" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <p class="font-medium text-sm" x-text="toast.message"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex h-full">
+    <!-- Sidebar -->
+    <aside class="w-64 glass border-r border-gray-200/50 dark:border-gray-700/50 p-6 space-y-6 hidden md:block shadow-lg">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+            </path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">
+            Admin Panel</h1>
+        </div>
+        <button @click="toggleTheme()"
+          class="w-10 h-10 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-all ml-auto"
+          aria-label="Toggle theme">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- User Info -->
+      <div class="glass rounded-xl p-4 space-y-2">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Logged in as</p>
+        <p class="font-semibold" x-text="currentUser.username"></p>
+        <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200"
+          x-text="currentUser.role ? currentUser.role.toUpperCase() : 'USER'"></span>
+      </div>
+
+      <nav class="space-y-2">
+        <a href="/index.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+            </path>
+          </svg>
+          Dashboard
+        </a>
+        <a href="/graphs.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+            </path>
+          </svg>
+          Graphs
+        </a>
+        <a href="/metrics-input.html"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+            </path>
+          </svg>
+          Enter Metrics
+        </a>
+        <button @click="handleLogout()"
+          class="w-full text-left px-4 py-3 rounded-xl glass hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+            </path>
+          </svg>
+          Logout
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+      <!-- Header -->
+      <header>
+        <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent"
+          x-text="isAdmin() ? 'System Admin Panel' : 'Query Table'"></h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1"
+          x-text="isAdmin() ? 'Manage database, projects, and metrics' : 'View and query data tables'"></p>
+      </header>
+
+      <!-- Tabs -->
+      <div class="glass rounded-2xl p-2 inline-flex gap-2 flex-wrap">
+        <button @click="activeTab = 'database'"
+          :class="activeTab === 'database' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          class="px-6 py-2 rounded-xl text-sm font-medium transition-all">
+          Database
+        </button>
+        <button x-show="isAdmin()" @click="activeTab = 'users'"
+          :class="activeTab === 'users' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          class="px-6 py-2 rounded-xl text-sm font-medium transition-all">
+          Users
+        </button>
+        <button x-show="isAdmin()" @click="activeTab = 'projects'"
+          :class="activeTab === 'projects' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          class="px-6 py-2 rounded-xl text-sm font-medium transition-all">
+          Projects
+        </button>
+        <button x-show="isAdmin()" @click="activeTab = 'metrics'"
+          :class="activeTab === 'metrics' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+          class="px-6 py-2 rounded-xl text-sm font-medium transition-all">
+          Metrics
+        </button>
+      </div>
+
+      <!-- Database Tab -->
+      <div x-show="activeTab === 'database'" x-cloak class="space-y-6">
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Query Database</h3>
+          <div class="space-y-4">
+            <div class="flex gap-3">
+              <select x-model="selectedTable"
+                class="flex-1 glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Select Table</option>
+                <option x-show="isAdmin()" value="users">Users</option>
+                <option x-show="isAdmin()" value="sessions">Sessions</option>
+                <option value="projects">Projects</option>
+                <option value="metric_inputs">Metric Inputs</option>
+                <option value="calculated_metrics">Calculated Metrics</option>
+                <option value="metric_definitions">Metric Definitions</option>
+              </select>
+              <button @click="queryTable()" :disabled="loading"
+                class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!loading">Query</span>
+                <span x-show="loading">Loading...</span>
+              </button>
+              <div class="flex items-center gap-2">
+                <button @click="queryTable('prev')" class="px-3 py-2 glass rounded-lg text-xs">Prev</button>
+                <button @click="queryTable('next')" class="px-3 py-2 glass rounded-lg text-xs">Next</button>
+              </div>
+            </div>
+
+            <!-- Table Results -->
+            <div x-show="tableData.length > 0" x-cloak class="space-y-3">
+              <div class="flex items-center justify-between">
+                <p class="text-sm text-gray-500 dark:text-gray-400" x-text="`${tableData.length} records`"></p>
+                <div class="flex gap-2">
+                  <span x-show="isAdmin() && selectedRecords.length > 0" class="text-sm text-gray-600 dark:text-gray-400" x-text="`${selectedRecords.length} selected`"></span>
+                  <button x-show="isAdmin() && selectedRecords.length > 0" @click="deleteSelectedRecords()"
+                    class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Delete Selected
+                  </button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-100 dark:bg-gray-800">
+                    <tr>
+                      <th x-show="isAdmin()" class="px-4 py-3 text-left w-12">
+                        <input type="checkbox" @change="toggleSelectAll($event.target.checked)"
+                          :checked="selectedRecords.length === tableData.length && tableData.length > 0"
+                          class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+                      </th>
+                      <template x-for="(value, key) in tableData[0]" :key="key">
+                        <th class="px-4 py-3 text-left font-semibold uppercase tracking-wide text-xs" x-text="key"></th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(row, index) in tableData" :key="index">
+                      <tr class="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        :class="selectedRecords.includes(row.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
+                        <td x-show="isAdmin()" class="px-4 py-3">
+                          <input type="checkbox" :checked="selectedRecords.includes(row.id)"
+                            @change="toggleRecordSelection(row.id)"
+                            class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+                        </td>
+                        <template x-for="(value, key) in row" :key="key">
+                          <td class="px-4 py-3" x-text="value"></td>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div x-show="tableData.length === 0 && queriedTable" x-cloak class="text-center py-8 text-gray-500 dark:text-gray-400">
+              No records found in this table
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users Tab -->
+      <div x-show="isAdmin() && activeTab === 'users'" x-cloak class="space-y-6">
+        <!-- Add User -->
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Add New User</h3>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <label class="block text-sm font-medium mb-2">Username*</label>
+              <input type="text" x-model="newUser.username" placeholder="Enter username"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Email*</label>
+              <input type="email" x-model="newUser.email" placeholder="user@example.com"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Password*</label>
+              <input type="password" x-model="newUser.password" placeholder="Enter password"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Role*</label>
+              <select x-model="newUser.role"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Select Role</option>
+                <option value="admin">Admin</option>
+                <option value="qa">QA</option>
+                <option value="individual">Individual</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+          </div>
+          <button @click="addUser()" class="mt-4 px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+            Add User
+          </button>
+        </div>
+
+        <!-- Users List -->
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Existing Users</h3>
+          <div class="space-y-2">
+            <template x-for="user in users" :key="user.id">
+              <div class="flex items-center justify-between p-4 glass rounded-xl border border-gray-200 dark:border-gray-700">
+                <div class="flex-1">
+                  <div class="flex items-center gap-3">
+                    <p class="font-medium" x-text="user.username"></p>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold"
+                      :class="{
+                        'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200': user.role === 'admin',
+                        'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200': user.role === 'qa',
+                        'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-200': user.role === 'individual',
+                        'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-200': user.role === 'viewer'
+                      }"
+                      x-text="user.role ? user.role.toUpperCase() : 'VIEWER'"></span>
+                    <span x-show="!user.is_active" class="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200">
+                      Inactive
+                    </span>
+                  </div>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="user.email"></p>
+                </div>
+                <div class="flex gap-2">
+                  <button @click="toggleUserActive(user)"
+                    :class="user.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'"
+                    class="px-4 py-2 text-white rounded-lg text-sm font-medium transition-all"
+                    x-text="user.is_active ? 'Deactivate' : 'Activate'">
+                  </button>
+                <button x-show="isAdmin()" @click="deleteUser(user.id)"
+                    class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-all">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projects Tab -->
+      <div x-show="isAdmin() && activeTab === 'projects'" x-cloak class="space-y-6">
+        <!-- Add Project -->
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Add New Project</h3>
+          <div class="flex gap-3">
+            <input type="text" x-model="newProject.name" placeholder="Project Name"
+              class="flex-1 glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <button @click="addProject()"
+              class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 transition-all">
+              Add Project
+            </button>
+          </div>
+        </div>
+
+        <!-- Project List -->
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Existing Projects</h3>
+          <div class="space-y-2">
+            <template x-for="project in projects" :key="project.id">
+              <div class="flex items-center justify-between p-4 glass rounded-xl border border-gray-200 dark:border-gray-700">
+                <div>
+                  <p class="font-medium" x-text="project.name"></p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400" x-text="`ID: ${project.id}`"></p>
+                </div>
+                <button x-show="isAdmin()" @click="deleteProject(project.id)"
+                  class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-all">
+                  Delete
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics Tab -->
+      <div x-show="isAdmin() && activeTab === 'metrics'" x-cloak class="space-y-6">
+        <!-- Add/Edit Metric Form -->
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4" x-text="editingMetric ? 'Edit Metric' : 'Add New Metric'"></h3>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <label class="block text-sm font-medium mb-2">Metric Key*</label>
+              <input type="text" x-model="newMetric.metric_key" placeholder="e.g., test_coverage"
+                :disabled="editingMetric !== null"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Metric Name*</label>
+              <input type="text" x-model="newMetric.name" placeholder="e.g., Test Coverage"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Unit*</label>
+              <input type="text" x-model="newMetric.unit" placeholder="e.g., %, TC/PD"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Direction*</label>
+              <select x-model="newMetric.direction"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Select Direction</option>
+                <option value="HTB">HTB (Higher The Better)</option>
+                <option value="LTB">LTB (Lower The Better)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Display Order</label>
+              <input type="number" x-model="newMetric.display_order" placeholder="0"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium mb-2">Description</label>
+              <textarea x-model="newMetric.description" placeholder="Optional description"
+                rows="2"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+          <div class="flex gap-3 mt-4">
+            <button @click="saveMetric()"
+              class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+              x-text="editingMetric ? 'Update Metric' : 'Add Metric'">
+            </button>
+            <button x-show="editingMetric" @click="cancelEdit()"
+              class="px-6 py-2 glass border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <!-- Metrics List -->
+        <div class="glass rounded-2xl p-6 shadow-lg">
+          <h3 class="text-xl font-semibold mb-4">Existing Metrics</h3>
+          <div class="space-y-3">
+            <template x-for="metric in availableMetrics" :key="metric.id">
+              <div class="p-4 glass rounded-xl border border-gray-200 dark:border-gray-700">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <p class="font-semibold text-base" x-text="metric.name"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" x-text="`Key: ${metric.metric_key}`"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400" x-text="`Unit: ${metric.unit}`"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400" x-show="metric.description" x-text="metric.description"></p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold"
+                      :class="metric.direction === 'HTB' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'"
+                      x-text="metric.direction"></span>
+                    <button @click="editMetric(metric)"
+                      class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-all">
+                      Edit
+                    </button>
+                    <button @click="toggleMetricActive(metric)"
+                      :class="metric.is_active ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'"
+                      class="px-3 py-1 text-white rounded text-xs font-medium transition-all"
+                      x-text="metric.is_active ? 'Disable' : 'Enable'">
+                    </button>
+                    <button x-show="isAdmin()" @click="deleteMetric(metric.id)"
+                      class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-all">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <div x-show="availableMetrics.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
+              No metrics configured. Add your first metric above.
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function admin() {
+      return {
+        isAdmin() {
+          try {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) return false;
+            const user = JSON.parse(userStr);
+            return user.role === 'admin';
+          } catch {
+            return false;
+          }
+        },
+        pageLimit: 50,
+        pageOffset: 0,
+        activeTab: 'database',
+        selectedTable: '',
+        tableData: [],
+        queriedTable: false,
+        loading: false,
+        selectedRecords: [],
+        users: [],
+        newUser: { username: '', email: '', password: '', role: '' },
+        projects: [],
+        newProject: { name: '' },
+        availableMetrics: [],
+        newMetric: { metric_key: '', name: '', unit: '', direction: '', description: '', display_order: 0 },
+        editingMetric: null,
+        currentUser: {},
+        toast: { show: false, message: '', type: 'success' },
+
+        async init() {
+          try {
+            if (!this.isAdmin()) {
+              document.title = 'QA Metrics - Query Table';
+            }
+          } catch {}
+          // Load current user info
+          try {
+            const userStr = localStorage.getItem('user');
+            if (userStr) {
+              this.currentUser = JSON.parse(userStr);
+            }
+          } catch (e) {
+            console.error('Error loading user:', e);
+          }
+
+          if (this.isAdmin()) {
+            await this.loadUsers();
+          }
+          await this.loadProjects();
+          await this.loadMetrics();
+        },
+
+        async queryTable(nextPage = null) {
+          if (!this.selectedTable) {
+            this.showToast('Please select a table', 'error');
+            return;
+          }
+
+          this.loading = true;
+          this.tableData = [];
+          this.queriedTable = false;
+          this.selectedRecords = [];
+
+          try {
+            console.log('Querying table:', this.selectedTable);
+            const token = localStorage.getItem('authToken');
+            // pagination
+            if (nextPage === 'next') this.pageOffset += this.pageLimit;
+            if (nextPage === 'prev') this.pageOffset = Math.max(0, this.pageOffset - this.pageLimit);
+            const q = new URLSearchParams({ limit: String(this.pageLimit), offset: String(this.pageOffset) });
+            const response = await fetch(`/api/admin/query/${this.selectedTable}?` + q.toString(), {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Error response:', errorText);
+              throw new Error(`Failed to query table: ${response.status} ${errorText}`);
+            }
+            
+            const payload = await response.json();
+            this.tableData = Array.isArray(payload) ? payload : (payload.data || []);
+            this.queriedTable = true;
+            console.log('Loaded data:', this.tableData, 'meta:', payload.meta);
+            
+            if (this.tableData.length === 0) {
+              this.showToast('No records found in this table', 'info');
+            } else {
+              this.showToast(`Loaded ${this.tableData.length} records`, 'success');
+            }
+          } catch (error) {
+            console.error('Error querying table:', error);
+            this.showToast('Failed to query table: ' + error.message, 'error');
+            this.tableData = [];
+            this.queriedTable = true;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        toggleRecordSelection(id) {
+          const index = this.selectedRecords.indexOf(id);
+          if (index > -1) {
+            this.selectedRecords.splice(index, 1);
+          } else {
+            this.selectedRecords.push(id);
+          }
+        },
+
+        toggleSelectAll(checked) {
+          if (checked) {
+            this.selectedRecords = this.tableData.map(row => row.id);
+          } else {
+            this.selectedRecords = [];
+          }
+        },
+
+        async deleteSelectedRecords() {
+          if (!this.selectedTable || this.selectedRecords.length === 0) return;
+          
+          const count = this.selectedRecords.length;
+          if (!confirm(`Are you sure you want to delete ${count} record${count > 1 ? 's' : ''} from ${this.selectedTable}?`)) {
+            return;
+          }
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          try {
+            for (const id of this.selectedRecords) {
+              try {
+                const token = localStorage.getItem('authToken');
+                const response = await fetch(`/api/admin/delete/${this.selectedTable}/${id}`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                  successCount++;
+                } else {
+                  errorCount++;
+                }
+              } catch (error) {
+                errorCount++;
+                console.error(`Error deleting record ${id}:`, error);
+              }
+            }
+
+            if (successCount > 0) {
+              this.showToast(`Successfully deleted ${successCount} record${successCount > 1 ? 's' : ''}`, 'success');
+            }
+            if (errorCount > 0) {
+              this.showToast(`Failed to delete ${errorCount} record${errorCount > 1 ? 's' : ''}`, 'error');
+            }
+
+            this.selectedRecords = [];
+            await this.queryTable(); // Refresh table
+          } catch (error) {
+            console.error('Error deleting records:', error);
+            this.showToast('Failed to delete records: ' + error.message, 'error');
+          }
+        },
+
+        async loadUsers() {
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/admin/users', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+              this.users = await response.json();
+            }
+          } catch (error) {
+            console.error('Error loading users:', error);
+          }
+        },
+
+        async addUser() {
+          if (!this.newUser.username || !this.newUser.email || !this.newUser.password || !this.newUser.role) {
+            this.showToast('Please fill all required fields', 'error');
+            return;
+          }
+
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/auth/register', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(this.newUser)
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to add user');
+            }
+
+            this.showToast('User added successfully', 'success');
+            this.newUser = { username: '', email: '', password: '', role: '' };
+            await this.loadUsers();
+          } catch (error) {
+            console.error('Error adding user:', error);
+            this.showToast('Failed to add user: ' + error.message, 'error');
+          }
+        },
+
+        async toggleUserActive(user) {
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/admin/users/${user.id}/toggle-active`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to toggle user status');
+
+            this.showToast(`User ${user.is_active ? 'deactivated' : 'activated'} successfully`, 'success');
+            await this.loadUsers();
+          } catch (error) {
+            console.error('Error toggling user:', error);
+            this.showToast('Failed to toggle user: ' + error.message, 'error');
+          }
+        },
+
+        async deleteUser(id) {
+          if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+            return;
+          }
+
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/admin/delete/users/${id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to delete user');
+
+            this.showToast('User deleted successfully', 'success');
+            await this.loadUsers();
+          } catch (error) {
+            console.error('Error deleting user:', error);
+            this.showToast('Failed to delete user: ' + error.message, 'error');
+          }
+        },
+
+        async loadProjects() {
+          try {
+            const response = await fetch('/api/projects');
+            this.projects = await response.json();
+          } catch (error) {
+            console.error('Error loading projects:', error);
+          }
+        },
+
+        async addProject() {
+          if (!this.newProject.name) {
+            this.showToast('Please enter project name', 'error');
+            return;
+          }
+
+          try {
+            const response = await fetch('/api/projects', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: this.newProject.name })
+            });
+
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to add project');
+            }
+
+            this.showToast('Project added successfully', 'success');
+            this.newProject.name = '';
+            await this.loadProjects();
+          } catch (error) {
+            console.error('Error adding project:', error);
+            this.showToast('Failed to add project: ' + error.message, 'error');
+          }
+        },
+
+        async deleteProject(id) {
+          if (!confirm('Are you sure you want to delete this project? This may affect related records.')) {
+            return;
+          }
+
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/admin/delete/projects/${id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to delete project');
+
+            this.showToast('Project deleted successfully', 'success');
+            await this.loadProjects();
+          } catch (error) {
+            console.error('Error deleting project:', error);
+            this.showToast('Failed to delete project: ' + error.message, 'error');
+          }
+        },
+
+        async loadMetrics() {
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/admin/metrics', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            this.availableMetrics = await response.json();
+          } catch (error) {
+            console.error('Error loading metrics:', error);
+          }
+        },
+
+        async saveMetric() {
+          if (!this.newMetric.metric_key || !this.newMetric.name || !this.newMetric.unit || !this.newMetric.direction) {
+            this.showToast('Please fill all required fields', 'error');
+            return;
+          }
+
+          try {
+            if (this.editingMetric) {
+              // Update existing metric
+              const token = localStorage.getItem('authToken');
+              const response = await fetch(`/api/admin/metrics/${this.editingMetric.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(this.newMetric)
+              });
+
+              if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to update metric');
+              }
+
+              this.showToast('Metric updated successfully', 'success');
+            } else {
+              // Add new metric
+              const token = localStorage.getItem('authToken');
+              const response = await fetch('/api/admin/metrics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(this.newMetric)
+              });
+
+              if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to add metric');
+              }
+
+              this.showToast('Metric added successfully', 'success');
+            }
+
+            this.cancelEdit();
+            await this.loadMetrics();
+          } catch (error) {
+            console.error('Error saving metric:', error);
+            this.showToast('Failed to save metric: ' + error.message, 'error');
+          }
+        },
+
+        editMetric(metric) {
+          this.editingMetric = metric;
+          this.newMetric = {
+            metric_key: metric.metric_key,
+            name: metric.name,
+            unit: metric.unit,
+            direction: metric.direction,
+            description: metric.description || '',
+            display_order: metric.display_order || 0
+          };
+        },
+
+        cancelEdit() {
+          this.editingMetric = null;
+          this.newMetric = { metric_key: '', name: '', unit: '', direction: '', description: '', display_order: 0 };
+        },
+
+        async toggleMetricActive(metric) {
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/admin/metrics/${metric.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ is_active: metric.is_active ? 0 : 1 })
+            });
+
+            if (!response.ok) throw new Error('Failed to toggle metric status');
+
+            this.showToast(`Metric ${metric.is_active ? 'disabled' : 'enabled'} successfully`, 'success');
+            await this.loadMetrics();
+          } catch (error) {
+            console.error('Error toggling metric:', error);
+            this.showToast('Failed to toggle metric: ' + error.message, 'error');
+          }
+        },
+
+        async deleteMetric(id) {
+          if (!confirm('Are you sure you want to delete this metric? This action cannot be undone.')) {
+            return;
+          }
+
+          try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/admin/delete/metric_definitions/${id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Failed to delete metric');
+
+            this.showToast('Metric deleted successfully', 'success');
+            await this.loadMetrics();
+          } catch (error) {
+            console.error('Error deleting metric:', error);
+            this.showToast('Failed to delete metric: ' + error.message, 'error');
+          }
+        },
+
+        showToast(message, type = 'success') {
+          this.toast.message = message;
+          this.toast.type = type;
+          this.toast.show = true;
+          setTimeout(() => { this.toast.show = false; }, 3000);
+        },
+
+        async handleLogout() {
+          const token = localStorage.getItem('authToken');
+          
+          if (token) {
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          }
+          
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login.html';
+        },
+
+        toggleTheme() {
+          document.documentElement.classList.toggle('dark');
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>
+
+

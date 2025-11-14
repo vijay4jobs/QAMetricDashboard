@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unused tables - kept for future use
+-- API routes for these tables are commented out in src/app.js
 CREATE TABLE IF NOT EXISTS test_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id INTEGER,
@@ -39,13 +41,3 @@ CREATE TABLE IF NOT EXISTS metric_targets (
   FOREIGN KEY(project_id) REFERENCES projects(id)
 );
 
--- Simple coverage placeholder table (optional)
-CREATE TABLE IF NOT EXISTS coverage_stats (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id INTEGER,
-  period_start DATETIME,
-  period_end DATETIME,
-  requirements_covered INTEGER,
-  requirements_total INTEGER,
-  FOREIGN KEY(project_id) REFERENCES projects(id)
-);

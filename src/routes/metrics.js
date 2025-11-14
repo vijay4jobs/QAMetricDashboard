@@ -1,63 +1,96 @@
 import express from 'express';
-import { getDb } from '../db.js';
 
 const router = express.Router();
 
-router.get('/overview', async (req, res) => {
-  const db = await getDb();
-  const { dateFrom, dateTo, projectId, tester } = req.query;
+const METRIC_CATALOG = [
+  {
+    key: 'test_design_productivity',
+    name: 'Test Design Productivity',
+    unit: 'TC/PD',
+    indicator: 'HTB',
+    definition: 'Number of test cases designed / Effort spent for creation, review, rework of test scenario and test cases'
+  },
+  {
+    key: 'test_execution_productivity',
+    name: 'Test Execution Productivity',
+    unit: 'TC/PD',
+    indicator: 'HTB',
+    definition: 'Test cases or test scripts executed / Effort spent for test case or test script execution'
+  },
+  {
+    key: 'test_design_coverage',
+    name: 'Test Design Coverage',
+    unit: '%',
+    indicator: 'HTB',
+    definition: 'Total number of testable requirements mapped to test cases / Total number of baselined testable requirements * 100'
+  },
+  {
+    key: 'test_execution_coverage',
+    name: 'Test Execution Coverage',
+    unit: '%',
+    indicator: 'HTB',
+    definition: 'Number of unique test cases or steps executed / Number of unique test cases or steps * 100'
+  },
+  {
+    key: 'test_environment_availability',
+    name: 'Test Environment Availability',
+    unit: '%',
+    indicator: 'HTB',
+    definition: 'Number of person days lost due to environment downtime by planned effort (in person days) for test team'
+  },
+  {
+    key: 'defect_rejection',
+    name: 'Defect Rejection',
+    unit: '%',
+    indicator: 'LTB',
+    definition: 'Total number of defects rejected by development team or customers / Number of valid defects raised'
+  },
+  {
+    key: 'effort_variation',
+    name: 'Effort Variation',
+    unit: '%',
+    indicator: 'LTB',
+    definition: '(Actual effort of closed tasks - Estimated effort of closed tasks) / Estimated effort of closed tasks * 100'
+  },
+  {
+    key: 'effort_per_story_point',
+    name: 'Effort Per Story Point',
+    unit: 'PHrs / Story Point',
+    indicator: 'LTB',
+    definition: 'Actual effort / Number of story points accepted in a sprint'
+  },
+  {
+    key: 'automation_coverage',
+    name: 'Automation Coverage',
+    unit: '%',
+    indicator: 'HTB',
+    definition: 'Number of unique automated test cases / Number of unique test cases'
+  },
+  {
+    key: 'schedule_variation',
+    name: 'Schedule Variation',
+    unit: '%',
+    indicator: 'LTB',
+    definition: '(Actual end date of closed tasks - Planned end date of closed tasks) / Planned end date of closed tasks * 100'
+  },
+  {
+    key: 'requirements_traceability',
+    name: 'Requirements Traceability',
+    unit: '%',
+    indicator: 'HTB',
+    definition: 'Number of requirements mapped to test cases / Total number of requirements * 100'
+  },
+  {
+    key: 'on_time_completion_milestones',
+    name: 'On Time Completion of Milestones or Deliverables',
+    unit: '%',
+    indicator: 'HTB',
+    definition: 'Number of milestones or deliverables completed on time / Total number of milestones or deliverables * 100'
+  }
+];
 
-  const filters = [];
-  const params = [];
-  if (projectId) { filters.push('project_id = ?'); params.push(projectId); }
-  if (dateFrom) { filters.push('created_at >= ?'); params.push(dateFrom); }
-  if (dateTo) { filters.push('created_at <= ?'); params.push(dateTo); }
-  const defectWhere = filters.length? 'WHERE '+filters.join(' AND '):'';
-
-  const runFilters = [];
-  const runParams = [];
-  if (projectId) { runFilters.push('project_id = ?'); runParams.push(projectId); }
-  if (dateFrom) { runFilters.push('executed_at >= ?'); runParams.push(dateFrom); }
-  if (dateTo) { runFilters.push('executed_at <= ?'); runParams.push(dateTo); }
-  if (tester) { runFilters.push('executed_by = ?'); runParams.push(tester); }
-  const runWhere = runFilters.length? 'WHERE '+runFilters.join(' AND '):'';
-
-  const defectsTesting = await db.get(`SELECT COUNT(*) as c FROM defects ${defectWhere} ${defectWhere? ' AND ': 'WHERE '} source = 'TESTING'`, params);
-  const defectsProd = await db.get(`SELECT COUNT(*) as c FROM defects ${defectWhere} ${defectWhere? ' AND ': 'WHERE '} source = 'PROD'`, params);
-  const ddr = (defectsTesting?.c||0) / Math.max(1, (defectsTesting?.c||0) + (defectsProd?.c||0));
-
-  const avgExec = await db.get(`SELECT AVG(duration_minutes) as avg FROM test_runs ${runWhere}`, runParams);
-  const regressionFailures = await db.get(`SELECT COUNT(*) as c FROM test_runs ${runWhere} ${runWhere? ' AND ': 'WHERE '} status = 'FAILED'`, runParams);
-  const blockedTests = await db.get(`SELECT COUNT(*) as c FROM test_runs ${runWhere} ${runWhere? ' AND ': 'WHERE '} status = 'BLOCKED'`, runParams);
-
-  // Coverage placeholder (if coverage_stats filled)
-  const cov = await db.get(`SELECT SUM(requirements_covered) as covered, SUM(requirements_total) as total FROM coverage_stats ${projectId? 'WHERE project_id = ?':''}`, projectId? [projectId]:[]);
-  const coverage = cov && cov.total ? cov.covered / cov.total : null;
-
-  // Simple trend: last 7 days DDR
-  const trend = await db.all(`WITH days AS (
-    SELECT date('now','-6 day') as d UNION ALL
-    SELECT date('now','-5 day') UNION ALL
-    SELECT date('now','-4 day') UNION ALL
-    SELECT date('now','-3 day') UNION ALL
-    SELECT date('now','-2 day') UNION ALL
-    SELECT date('now','-1 day') UNION ALL
-    SELECT date('now')
-  )
-  SELECT d as day,
-    (SELECT COUNT(*) FROM defects WHERE source='TESTING' AND date(created_at)=d ${projectId? ' AND project_id = ?':''}) as test_def,
-    (SELECT COUNT(*) FROM defects WHERE source='PROD' AND date(created_at)=d ${projectId? ' AND project_id = ?':''}) as prod_def
-  FROM days`, projectId? [projectId, projectId]: []);
-  const ddrTrend = trend.map(t => ({ day: t.day, ddr: t.test_def / Math.max(1, t.test_def + t.prod_def) }));
-
-  res.json({
-    ddr: Number(ddr.toFixed(3)),
-    avg_execution_time_min: avgExec?.avg? Number(avgExec.avg.toFixed(2)) : 0,
-    coverage: coverage !== null ? Number((coverage*100).toFixed(1)) : null,
-    regression_failures: regressionFailures?.c||0,
-    blocked_tests: blockedTests?.c||0,
-    ddr_trend: ddrTrend
-  });
+router.get('/catalog', (req, res) => {
+  res.json(METRIC_CATALOG);
 });
 
 export default router;
