@@ -19,13 +19,26 @@ Data is lost every time you deploy because:
 - Safe to run multiple times
 
 ### 3. Dockerfile Updated
-- Removed automatic migration execution on container start
-- Migrations must be run manually or via deployment script
-- Prevents accidental data loss
+- Added entrypoint script that runs migrations automatically on container start
+- Migrations are safe to run on every start due to tracking system
+- Only new migrations will execute, already-applied ones are skipped
+- Prevents data loss while ensuring migrations run automatically
 
 ## 🚀 Deployment Steps (IMPORTANT)
 
-### For Render.com:
+### For Render.com (Docker):
+
+1. **Automatic Migrations:**
+   - Migrations run automatically on container start via entrypoint script
+   - Only new migrations will execute, already-applied ones are skipped
+   - Your data will be preserved
+
+2. **On Subsequent Deploys:**
+   - Migrations run automatically on each deploy
+   - Migration tracking ensures no duplicate execution
+   - Data is preserved between deployments
+
+### For Render.com (Non-Docker):
 
 1. **First Time Setup:**
    ```bash
@@ -34,9 +47,8 @@ Data is lost every time you deploy because:
    ```
 
 2. **On Subsequent Deploys:**
-   - Migrations will automatically skip already-applied ones
-   - Only new migrations will run
-   - Your data will be preserved
+   - Run migrations manually if needed: `npm run migrate`
+   - Or configure in build/start commands
 
 3. **Verify DATABASE_URL:**
    - Go to Render Dashboard → Your Web Service → Environment
@@ -56,16 +68,16 @@ Data is lost every time you deploy because:
 
 ### For Docker:
 
-1. **First Time:**
-   ```bash
-   docker-compose up -d
-   docker-compose exec app npm run migrate
-   ```
-
-2. **On Updates:**
+1. **First Time & Updates:**
    ```bash
    docker-compose up -d --build
-   # Migrations will only run new ones automatically
+   # Migrations run automatically on container start
+   # Only new migrations will execute, already-applied ones are skipped
+   ```
+
+2. **Manual Migration (if needed):**
+   ```bash
+   docker-compose exec app npm run migrate
    ```
 
 ## ⚠️ Critical Checks

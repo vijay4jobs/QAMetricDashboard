@@ -15,8 +15,9 @@ COPY . .
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Change ownership
-RUN chown -R nodejs:nodejs /app
+# Make entrypoint executable and change ownership
+RUN chmod +x /app/docker-entrypoint.sh && \
+    chown -R nodejs:nodejs /app
 USER nodejs
 
 # Expose port
@@ -26,7 +27,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start command - migrations should be run manually or via init script
-# To run migrations: docker exec <container> npm run migrate
-CMD ["npm", "start"]
+# Use entrypoint script that runs migrations then starts app
+# Migrations are safe to run on every start due to tracking system
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
