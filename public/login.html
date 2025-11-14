@@ -143,7 +143,7 @@
           <div class="grid gap-4">
             <input type="text" x-model="signupForm.username" placeholder="Username"
               class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="email" x-model="signupForm.email" placeholder="Email"
+            <input type="email" x-model="signupForm.email" @input="handleEmailInput()" placeholder="Email"
               class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="password" x-model="signupForm.password" placeholder="Password"
               class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -226,6 +226,31 @@
           if (this.isAdminUsername()) {
             this.form.projectId = '';
           }
+        },
+
+        handleEmailInput() {
+          const email = this.signupForm.email || '';
+          const domain = '@qametrics.com';
+          
+          // If email is empty, don't do anything
+          if (!email.trim()) {
+            return;
+          }
+          
+          // If email already ends with @qametrics.com, leave it as is
+          if (email.endsWith(domain)) {
+            return;
+          }
+          
+          // If email contains @ but doesn't end with @qametrics.com, replace domain part
+          if (email.includes('@')) {
+            const localPart = email.split('@')[0];
+            this.signupForm.email = localPart + domain;
+            return;
+          }
+          
+          // If email doesn't contain @, append @qametrics.com
+          this.signupForm.email = email + domain;
         },
 
         async handleLogin() {
