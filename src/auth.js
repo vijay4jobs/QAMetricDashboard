@@ -92,6 +92,33 @@ export async function login(req, res) {
   }
 }
 
+// Check username availability
+export async function checkUsername(req, res) {
+  const { username } = req.query;
+
+  if (!username || username.trim().length === 0) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
+  try {
+    const db = await getDb();
+    
+    // Check if username already exists
+    const existingUser = await db.get(
+      `SELECT id FROM users WHERE username = ?`,
+      [username.trim()]
+    );
+
+    res.json({
+      available: !existingUser,
+      username: username.trim()
+    });
+  } catch (error) {
+    console.error('Username check error:', error);
+    res.status(500).json({ error: 'Failed to check username availability' });
+  }
+}
+
 // Register handler
 export async function register(req, res) {
   const { username, email, password, role } = req.body;

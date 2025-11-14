@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
+    "stop": "powershell -Command \"$process = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; if ($process) { Stop-Process -Id $process -Force; Write-Host 'Server stopped on port 3000' } else { Write-Host 'No server running on port 3000' }\"",
     "migrate": "node scripts/runMigrations.js",
     "seed": "node seed/seed.js"
   },

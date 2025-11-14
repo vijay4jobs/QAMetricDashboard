@@ -11,7 +11,7 @@ import projectsRouter from './routes/projects.js';
 import metricInputsRouter from './routes/metricInputs.js';
 import XLSX from 'xlsx';
 import adminRouter from './routes/admin.js';
-import { login, register, logout, authMiddleware, requireRole } from './auth.js';
+import { login, register, logout, authMiddleware, requireRole, checkUsername } from './auth.js';
 
 dotenv.config();
 const app = express();
@@ -31,6 +31,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Public routes
 app.post('/api/auth/login', login);
+app.get('/api/auth/check-username', checkUsername);
 app.post('/api/auth/register', register);
 app.post('/api/auth/logout', authMiddleware, logout);
 

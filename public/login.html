@@ -141,12 +141,63 @@
           </div>
 
           <div class="grid gap-4">
-            <input type="text" x-model="signupForm.username" placeholder="Username"
+            <div>
+              <input type="text" x-model="signupForm.username" @input="handleUsernameInput()" placeholder="Username"
+                :class="usernameCheckStatus === 'taken' ? 'border-red-500 focus:ring-red-500' : usernameCheckStatus === 'available' ? 'border-green-500 focus:ring-green-500' : ''"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2">
+              <div x-show="signupForm.username && usernameCheckStatus" x-cloak class="mt-1 text-xs">
+                <span x-show="usernameCheckStatus === 'checking'" class="text-gray-500 dark:text-gray-400">Checking availability...</span>
+                <span x-show="usernameCheckStatus === 'available'" class="text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                  </svg>
+                  Username available
+                </span>
+                <span x-show="usernameCheckStatus === 'taken'" class="text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                  </svg>
+                  User exist
+                </span>
+              </div>
+            </div>
+            <input type="email" x-model="signupForm.email" @keydown="handleEmailKeydown($event)" placeholder="Email"
               class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="email" x-model="signupForm.email" @input="handleEmailInput()" placeholder="Email"
-              class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="password" x-model="signupForm.password" placeholder="Password"
-              class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div>
+              <input type="password" x-model="signupForm.password" @input="validatePassword()" placeholder="Password"
+                :class="passwordValid ? 'border-green-500 focus:ring-green-500' : signupForm.password && !passwordValid ? 'border-red-500 focus:ring-red-500' : ''"
+                class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2">
+              <div x-show="signupForm.password" x-cloak class="mt-2 text-xs space-y-1">
+                <p class="font-medium text-gray-700 dark:text-gray-300 mb-1">Password requirements:</p>
+                <div class="space-y-0.5">
+                  <div :class="passwordChecks.length >= 8 ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'" class="flex items-center gap-1">
+                    <span x-show="passwordChecks.length >= 8" class="text-green-600 dark:text-green-400">✓</span>
+                    <span x-show="passwordChecks.length < 8" class="text-gray-400">○</span>
+                    At least 8 characters
+                  </div>
+                  <div :class="passwordChecks.hasUppercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'" class="flex items-center gap-1">
+                    <span x-show="passwordChecks.hasUppercase" class="text-green-600 dark:text-green-400">✓</span>
+                    <span x-show="!passwordChecks.hasUppercase" class="text-gray-400">○</span>
+                    One uppercase letter
+                  </div>
+                  <div :class="passwordChecks.hasLowercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'" class="flex items-center gap-1">
+                    <span x-show="passwordChecks.hasLowercase" class="text-green-600 dark:text-green-400">✓</span>
+                    <span x-show="!passwordChecks.hasLowercase" class="text-gray-400">○</span>
+                    One lowercase letter
+                  </div>
+                  <div :class="passwordChecks.hasNumber ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'" class="flex items-center gap-1">
+                    <span x-show="passwordChecks.hasNumber" class="text-green-600 dark:text-green-400">✓</span>
+                    <span x-show="!passwordChecks.hasNumber" class="text-gray-400">○</span>
+                    One number
+                  </div>
+                  <div :class="passwordChecks.hasSpecial ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'" class="flex items-center gap-1">
+                    <span x-show="passwordChecks.hasSpecial" class="text-green-600 dark:text-green-400">✓</span>
+                    <span x-show="!passwordChecks.hasSpecial" class="text-gray-400">○</span>
+                    One special character (!@#$%^&*)
+                  </div>
+                </div>
+              </div>
+            </div>
             <select x-model="signupForm.role"
               class="w-full glass border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select Role</option>
@@ -155,7 +206,7 @@
               <option value="viewer">Viewer</option>
             </select>
           </div>
-          <button @click="handleSignup()" :disabled="signupLoading"
+          <button @click="handleSignup()" :disabled="signupLoading || usernameCheckStatus !== 'available' || !passwordValid || !signupForm.username.trim()"
             class="w-full px-6 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             <span x-show="!signupLoading">Sign Up</span>
             <span x-show="signupLoading">Creating account...</span>
@@ -200,6 +251,16 @@
         signupSuccess: '',
         error: '',
         loading: false,
+        usernameCheckStatus: '', // '', 'checking', 'available', 'taken'
+        usernameCheckTimeout: null,
+        passwordChecks: {
+          length: 0,
+          hasUppercase: false,
+          hasLowercase: false,
+          hasNumber: false,
+          hasSpecial: false
+        },
+        passwordValid: false,
 
         async init() {
           // Redirect if user info exists (cookie-based auth now)
@@ -228,29 +289,75 @@
           }
         },
 
-        handleEmailInput() {
-          const email = this.signupForm.email || '';
-          const domain = '@qametrics.com';
-          
-          // If email is empty, don't do anything
-          if (!email.trim()) {
+        handleEmailKeydown(event) {
+          // Check if "@" key is pressed (Shift+2 or direct @ key)
+          if (event.key === '@' || (event.shiftKey && event.key === '2')) {
+            // Prevent default "@" insertion
+            event.preventDefault();
+            
+            // Get current email value
+            const currentEmail = this.signupForm.email || '';
+            
+            // Check if email already contains "@qametrics.com" to avoid duplicates
+            if (currentEmail.includes('@qametrics.com')) {
+              return;
+            }
+            
+            // Append "@qametrics.com" to the current email
+            this.signupForm.email = currentEmail + '@qametrics.com';
+          }
+        },
+
+        handleUsernameInput() {
+          // Clear previous timeout
+          if (this.usernameCheckTimeout) {
+            clearTimeout(this.usernameCheckTimeout);
+          }
+
+          const username = (this.signupForm.username || '').trim();
+
+          // Reset status if username is empty
+          if (!username) {
+            this.usernameCheckStatus = '';
             return;
           }
+
+          // Debounce the check (wait 500ms after user stops typing)
+          this.usernameCheckStatus = 'checking';
+          this.usernameCheckTimeout = setTimeout(async () => {
+            try {
+              const response = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`);
+              const data = await response.json();
+              
+              if (response.ok) {
+                this.usernameCheckStatus = data.available ? 'available' : 'taken';
+              } else {
+                this.usernameCheckStatus = '';
+              }
+            } catch (error) {
+              console.error('Username check error:', error);
+              this.usernameCheckStatus = '';
+            }
+          }, 500);
+        },
+
+        validatePassword() {
+          const password = this.signupForm.password || '';
           
-          // If email already ends with @qametrics.com, leave it as is
-          if (email.endsWith(domain)) {
-            return;
-          }
-          
-          // If email contains @ but doesn't end with @qametrics.com, replace domain part
-          if (email.includes('@')) {
-            const localPart = email.split('@')[0];
-            this.signupForm.email = localPart + domain;
-            return;
-          }
-          
-          // If email doesn't contain @, append @qametrics.com
-          this.signupForm.email = email + domain;
+          this.passwordChecks = {
+            length: password.length,
+            hasUppercase: /[A-Z]/.test(password),
+            hasLowercase: /[a-z]/.test(password),
+            hasNumber: /[0-9]/.test(password),
+            hasSpecial: /[!@#$%^&*]/.test(password)
+          };
+
+          this.passwordValid = 
+            this.passwordChecks.length >= 8 &&
+            this.passwordChecks.hasUppercase &&
+            this.passwordChecks.hasLowercase &&
+            this.passwordChecks.hasNumber &&
+            this.passwordChecks.hasSpecial;
         },
 
         async handleLogin() {
@@ -310,6 +417,30 @@
               throw new Error('Please fill all required fields');
             }
 
+            // Ensure username has been checked and is available
+            if (!this.signupForm.username.trim()) {
+              throw new Error('Username is required');
+            }
+
+            // Check if username check is still in progress
+            if (this.usernameCheckStatus === 'checking') {
+              throw new Error('Please wait while we check username availability.');
+            }
+
+            // Check username availability before submitting - must be explicitly 'available'
+            if (this.usernameCheckStatus !== 'available') {
+              if (this.usernameCheckStatus === 'taken') {
+                throw new Error('Username is already taken. Please choose a different username.');
+              } else {
+                throw new Error('Please wait for username validation to complete.');
+              }
+            }
+
+            // Validate password requirements
+            if (!this.passwordValid) {
+              throw new Error('Password does not meet the requirements. Please check the password requirements below.');
+            }
+
             const response = await fetch('/api/auth/register', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -324,6 +455,15 @@
 
             this.signupSuccess = 'Account created successfully. You can now sign in.';
             this.signupForm = { username: '', email: '', password: '', role: '' };
+            this.usernameCheckStatus = '';
+            this.passwordChecks = {
+              length: 0,
+              hasUppercase: false,
+              hasLowercase: false,
+              hasNumber: false,
+              hasSpecial: false
+            };
+            this.passwordValid = false;
           } catch (error) {
             console.error('Signup error:', error);
             this.signupError = error.message || 'Failed to create account';
